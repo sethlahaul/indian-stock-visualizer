@@ -9,39 +9,67 @@ def get_stock_data(ticker, months=6):
     data = stock.history(period=period, interval='1d')
     return data
 
+def get_fundamental_metrics(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.get_info()
+    
+    def format_currency(value):
+        return f"₹{value:,}" if isinstance(value, (int, float)) else "N/A"
+    
+    def format_percentage(value):
+        return f"{value * 100:.2f}%" if isinstance(value, (int, float)) else "N/A"
+    
+    return {
+        "Market Cap": format_currency(info.get('marketCap', 0)),
+        "P/E Ratio": info.get('trailingPE', 'N/A'),
+        "EPS": info.get('trailingEps', 'N/A'),
+        "P/B Ratio": info.get('priceToBook', 'N/A'),
+        "Dividend Yield": format_percentage(info.get('dividendYield', 0)),
+        "ROE": format_percentage(info.get('returnOnEquity', 0)),
+        "ROA": format_percentage(info.get('returnOnAssets', 0)),
+        "Debt-to-Equity Ratio": info.get('debtToEquity', 'N/A'),
+        "Current Ratio": info.get('currentRatio', 'N/A'),
+        "Profit Margins": format_percentage(info.get('profitMargins', 0)),
+        "Revenue": format_currency(info.get('totalRevenue', 0)),
+        "Net Income": format_currency(info.get('netIncomeToCommon', 0)),
+        "Operating Cash Flow": format_currency(info.get('operatingCashflow', 0)),
+        "Free Cash Flow": format_currency(info.get('freeCashflow', 0))
+    }
+
 def get_dividends_splits(ticker):
     stock = yf.Ticker(ticker)
     dividends = stock.dividends.tail(5)
     splits = stock.splits.tail(5)
+    
+    if dividends.empty:
+        dividends = pd.Series(["No Dividends"], index=[pd.Timestamp.today().date()])
+    if splits.empty:
+        splits = pd.Series(["No Split"], index=[pd.Timestamp.today().date()])
+    
     dividends.index = dividends.index.date
     splits.index = splits.index.date
-    dividends = dividends.apply(lambda x: f"₹{x:.2f}")
-    splits = splits.apply(lambda x: f"{int(x)}:1" if x > 1 else "No Split")
+    
     return dividends, splits
 
-def evaluate_stock(df, stock_symbol):
-    if df.empty:
-        return "No data available"
-    
-    recent_close = df['Close'].iloc[-1]
-    avg_close = df['Close'].mean()
-    std_dev = df['Close'].std()
-    
-    if recent_close > avg_close + std_dev:
-        return "🔴 Overvalued - The stock price is significantly above its average. Consider market trends and financial reports before investing."
-    elif recent_close < avg_close - std_dev:
-        return "🟢 Undervalued - The stock price is significantly below its average. If the company has strong future prospects, this could be a good buying opportunity."
+def evaluate_stock(price_history):
+    recent_prices = price_history['Close'].tail(30)
+    if recent_prices.empty:
+        return "Insufficient Data"
+    avg_price = recent_prices.mean()
+    last_price = recent_prices.iloc[-1]
+    if last_price > avg_price * 1.1:
+        return "Overvalued"
+    elif last_price < avg_price * 0.9:
+        return "Undervalued"
     else:
-        return "🟡 Fairly Valued - The stock price is within a reasonable range. Check future growth prospects and company fundamentals before making a decision."
+        return "Fairly Valued"
 
 def main():
     st.set_page_config(page_title="Indian Stock Visualizer", layout="wide")
     st.title("📈 Indian Stock Data Visualizer (NSE/BSE)")
     
-    with st.sidebar.expander("⚙️ Settings", expanded=False):
-        exchange = st.radio("Select Exchange:", ("NSE", "BSE"))
-        
-        nifty_sensex_stocks = {
+    with st.sidebar:
+        stock_list = {
             "Reliance Industries": "RELIANCE.NS", "Tata Consultancy Services": "TCS.NS", "Infosys": "INFY.NS", "HDFC Bank": "HDFCBANK.NS",
             "ICICI Bank": "ICICIBANK.NS", "Kotak Mahindra Bank": "KOTAKBANK.NS", "Larsen & Toubro": "LT.NS", "Axis Bank": "AXISBANK.NS",
             "Hindustan Unilever": "HINDUNILVR.NS", "State Bank of India": "SBIN.NS", "Bajaj Finance": "BAJFINANCE.NS", "Bharti Airtel": "BHARTIARTL.NS",
@@ -54,53 +82,59 @@ def main():
             "Hindalco Industries": "HINDALCO.NS", "Divi's Laboratories": "DIVISLAB.NS", "Apollo Hospitals": "APOLLOHOSP.NS", "UPL": "UPL.NS",
             "Oil & Natural Gas Corp": "ONGC.NS", "Coal India": "COALINDIA.NS", "Tata Consumer Products": "TATACONSUM.NS"
         }
-        
-        sorted_stocks = sorted(nifty_sensex_stocks.keys())
+        sorted_stocks = sorted(stock_list.keys())
         stock_selection = st.multiselect("Select Stocks:", sorted_stocks, default=[sorted_stocks[0]])
-        stock_symbols = [nifty_sensex_stocks[stock] for stock in stock_selection]
         months = st.slider("Select Months of Historical Data:", 1, 60, 6)
+        exchange = st.radio("Select Exchange:", ["NSE", "BSE"])
     
     all_data = []
-    if stock_symbols:
-        for stock_symbol, company_name in zip(stock_symbols, stock_selection):
+    if stock_selection:
+        for company_name in stock_selection:
+            stock_symbol = stock_list[company_name]
+            if exchange == "BSE":
+                stock_symbol = stock_symbol.replace(".NS", ".BO")
+            
             with st.expander(f"📌 {company_name}"):
                 with st.spinner(f"Fetching data for {company_name}..."):
                     try:
                         df = get_stock_data(stock_symbol, months)
-                        dividends, splits = get_dividends_splits(stock_symbol)
+                        if df.empty:
+                            st.error(f"No data found for {company_name}.")
+                            continue
                         
-                        if not df.empty:
-                            df['Stock'] = company_name
-                            all_data.append(df)
-                            
-                            st.subheader(f"Stock Data for {company_name}")
-                            fig = px.line(df, x=df.index, y=['Open', 'Close'], title=f"Open & Closing Prices of {company_name}")
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            valuation = evaluate_stock(df, stock_symbol)
-                            st.markdown(f"### 🏆 **Valuation Status: {valuation}**", unsafe_allow_html=True)
-                            
-                            if not dividends.empty:
-                                st.subheader("📅 Recent Dividend Declarations")
-                                st.dataframe(dividends)
-                            
-                            if not splits.empty:
-                                st.subheader("📅 Recent Stock Splits")
-                                st.dataframe(splits)
-                        else:
-                            st.error(f"No data found for {company_name}. Please check the stock symbol.")
+                        fundamentals = get_fundamental_metrics(stock_symbol)
+                        dividends, splits = get_dividends_splits(stock_symbol)
+                        df['Stock'] = company_name
+                        all_data.append(df)
+                        
+                        st.subheader(f"Stock Data for {company_name}")
+                        fig = px.line(df, x=df.index, y=['Open', 'Close'], title=f"Open & Close Prices of {company_name}")
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        st.subheader("📊 Fundamental Metrics")
+                        st.table(pd.DataFrame(fundamentals.items(), columns=["Metric", "Value"]))
+                        
+                        evaluation = evaluate_stock(df)
+                        st.subheader("Stock Evaluation")
+                        st.markdown(f"**This stock is currently: {evaluation}**")
+                        
+                        st.subheader("Dividends & Stock Splits")
+                        st.table(pd.DataFrame({
+                            "Date": dividends.index.tolist() + splits.index.tolist(),
+                            "Dividend": dividends.tolist() + ["-"] * len(splits),
+                            "Stock Split": ["-"] * len(dividends) + splits.tolist()
+                        }).sort_values(by="Date", ascending=False).reset_index(drop=True))
                     except Exception as e:
-                        st.error(f"Error fetching data for {company_name}: {e}")
-        
-        if all_data:
-            combined_df = pd.concat(all_data)
-            with st.expander("📊 Stock Comparison Chart"):
-                comparison_fig = px.line(combined_df, x=combined_df.index, y='Close', color='Stock', title="Stock Comparison")
-                st.plotly_chart(comparison_fig, use_container_width=True)
+                        st.error(f"Error fetching data: {e}")
+    
+    if all_data:
+        combined_df = pd.concat(all_data)
+        with st.expander("📊 Stock Comparison & Volume Analysis"):
+            comparison_fig = px.line(combined_df, x=combined_df.index, y='Close', color='Stock', title="Stock Comparison")
+            st.plotly_chart(comparison_fig, use_container_width=True)
             
-            with st.expander("📈 Volume of Shares Traded"):
-                volume_fig = px.line(combined_df, x=combined_df.index, y='Volume', color='Stock', title="Volume of Shares Traded")
-                st.plotly_chart(volume_fig, use_container_width=True)
+            volume_fig = px.line(combined_df, x=combined_df.index, y='Volume', color='Stock', title="Volume of Shares Traded")
+            st.plotly_chart(volume_fig, use_container_width=True)
 
 if __name__ == "__main__":
     main()
