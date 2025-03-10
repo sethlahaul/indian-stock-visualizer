@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
+from stock_database import search_stocks
 
 # Helper functions
 def get_stock_data(ticker, period="6mo", interval="1d"):
@@ -281,14 +282,47 @@ def main():
             "Tata Consumer Products": "TATACONSUM"
         }
         
-        # Custom stock input
-        custom_stock = st.text_input("Or enter a custom stock symbol (without exchange suffix):").upper()
+        # Custom stock input with autocomplete
+        st.markdown("### Custom Stock Input")
+        custom_stock_input = st.text_input("Enter stock name or symbol:").strip()
+        
+        if custom_stock_input and len(custom_stock_input) >= 2:
+            # Search for matching stocks
+            matches = search_stocks(custom_stock_input)
+            
+            if matches:
+                # Display matching stocks as radio buttons
+                st.markdown("#### Matching Stocks:")
+                stock_options = [match['display_text'] for match in matches]
+                stock_options.insert(0, "None of these")  # Add option to ignore suggestions
+                
+                selected_option = st.radio("Select a stock:", stock_options, key="stock_matches")
+                
+                if selected_option != "None of these":
+                    # Extract the symbol from the selected option
+                    for match in matches:
+                        if match['display_text'] == selected_option:
+                            custom_stock = match['symbol']
+                            custom_stock_name = match['company_name']
+                            break
+                else:
+                    # Use the input as is
+                    custom_stock = custom_stock_input.upper()
+                    custom_stock_name = custom_stock_input.upper()
+            else:
+                # No matches found, use input as is
+                custom_stock = custom_stock_input.upper()
+                custom_stock_name = custom_stock_input.upper()
+                st.info(f"No matching stocks found for '{custom_stock_input}'. Using as entered.")
+        else:
+            custom_stock = ""
+            custom_stock_name = ""
         
         # Stock selection based on mode
         if analysis_mode == "Single Stock Analysis":
             if custom_stock:
                 selected_stock = custom_stock
-                selected_stock_name = custom_stock
+                selected_stock_name = custom_stock_name
             else:
                 selected_stock_name = st.selectbox("Select a Stock:", sorted(nifty_sensex_stocks.keys()))
                 selected_stock = nifty_sensex_stocks[selected_stock_name]
@@ -299,7 +333,7 @@ def main():
             if custom_stock:
                 st.info("Custom stock will be added to your selection")
                 additional_stocks = [custom_stock]
-                additional_names = [custom_stock]
+                additional_names = [custom_stock_name]
             else:
                 additional_stocks = []
                 additional_names = []
