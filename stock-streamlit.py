@@ -231,120 +231,35 @@ def main():
             selected_interval = st.selectbox("Select Interval:", list(interval_options.keys()), index=0)
             interval = interval_options[selected_interval]
         
-        # Stock dictionary - major Indian stocks
-        nifty_sensex_stocks = {
-            "Reliance Industries": "RELIANCE", 
-            "Tata Consultancy Services": "TCS", 
-            "HDFC Bank": "HDFCBANK",
-            "Infosys": "INFY", 
-            "ICICI Bank": "ICICIBANK", 
-            "Kotak Mahindra Bank": "KOTAKBANK", 
-            "Larsen & Toubro": "LT", 
-            "Axis Bank": "AXISBANK",
-            "Hindustan Unilever": "HINDUNILVR", 
-            "State Bank of India": "SBIN", 
-            "Bajaj Finance": "BAJFINANCE", 
-            "Bharti Airtel": "BHARTIARTL",
-            "Tata Steel": "TATASTEEL", 
-            "ITC": "ITC", 
-            "Maruti Suzuki": "MARUTI", 
-            "Asian Paints": "ASIANPAINT", 
-            "HCL Technologies": "HCLTECH",
-            "Wipro": "WIPRO", 
-            "Tech Mahindra": "TECHM", 
-            "UltraTech Cement": "ULTRACEMCO", 
-            "Sun Pharma": "SUNPHARMA", 
-            "Titan Company": "TITAN",
-            "Bajaj Auto": "BAJAJ-AUTO", 
-            "Power Grid Corp": "POWERGRID", 
-            "NTPC": "NTPC", 
-            "Grasim Industries": "GRASIM", 
-            "IndusInd Bank": "INDUSINDBK",
-            "Tata Motors": "TATAMOTORS", 
-            "Nestle India": "NESTLEIND", 
-            "Mahindra & Mahindra": "M&M", 
-            "Dr. Reddy's Laboratories": "DRREDDY",
-            "JSW Steel": "JSWSTEEL", 
-            "Cipla": "CIPLA", 
-            "Adani Enterprises": "ADANIENT", 
-            "Adani Ports": "ADANIPORTS", 
-            "Eicher Motors": "EICHERMOT",
-            "HDFC Life Insurance": "HDFCLIFE", 
-            "SBI Life Insurance": "SBILIFE", 
-            "Bajaj Finserv": "BAJAJFINSV", 
-            "Britannia Industries": "BRITANNIA",
-            "Hindalco Industries": "HINDALCO", 
-            "Divi's Laboratories": "DIVISLAB", 
-            "Apollo Hospitals": "APOLLOHOSP", 
-            "UPL": "UPL",
-            "Oil & Natural Gas Corp": "ONGC", 
-            "Coal India": "COALINDIA", 
-            "Tata Consumer Products": "TATACONSUM"
-        }
+        # Get stock list from stock_database
+        from stock_database import get_stock_database
         
-        # Custom stock input with autocomplete
-        st.markdown("### Custom Stock Input")
-        custom_stock_input = st.text_input("Enter stock name or symbol:").strip()
+        # Get the stock database
+        stocks_df = get_stock_database()
         
-        if custom_stock_input and len(custom_stock_input) >= 2:
-            # Search for matching stocks
-            matches = search_stocks(custom_stock_input)
-            
-            if matches:
-                # Display matching stocks as radio buttons
-                st.markdown("#### Matching Stocks:")
-                stock_options = [match['display_text'] for match in matches]
-                stock_options.insert(0, "None of these")  # Add option to ignore suggestions
-                
-                selected_option = st.radio("Select a stock:", stock_options, key="stock_matches")
-                
-                if selected_option != "None of these":
-                    # Extract the symbol from the selected option
-                    for match in matches:
-                        if match['display_text'] == selected_option:
-                            custom_stock = match['symbol']
-                            custom_stock_name = match['company_name']
-                            break
-                else:
-                    # Use the input as is
-                    custom_stock = custom_stock_input.upper()
-                    custom_stock_name = custom_stock_input.upper()
-            else:
-                # No matches found, use input as is
-                custom_stock = custom_stock_input.upper()
-                custom_stock_name = custom_stock_input.upper()
-                st.info(f"No matching stocks found for '{custom_stock_input}'. Using as entered.")
-        else:
-            custom_stock = ""
-            custom_stock_name = ""
+        # Create a dictionary of company names to symbols
+        nifty_sensex_stocks = {}
+        for _, row in stocks_df.iterrows():
+            nifty_sensex_stocks[row['company_name']] = row['symbol']
         
-        # Stock selection based on mode
+        # Stock selection is now done exclusively from the database
+        # Custom stock input has been removed as we now have all listed stocks
+        
+        # Stock selection based on mode - simplified without custom stock input
         if analysis_mode == "Single Stock Analysis":
-            if custom_stock:
-                selected_stock = custom_stock
-                selected_stock_name = custom_stock_name
-            else:
-                selected_stock_name = st.selectbox("Select a Stock:", sorted(nifty_sensex_stocks.keys()))
-                selected_stock = nifty_sensex_stocks[selected_stock_name]
+            selected_stock_name = st.selectbox("Select a Stock:", sorted(nifty_sensex_stocks.keys()))
+            selected_stock = nifty_sensex_stocks[selected_stock_name]
             
             stock_symbols = [f"{selected_stock}{exchange_suffix}"]
             stock_names = [selected_stock_name]
         else:  # Multi-Stock Comparison
-            if custom_stock:
-                st.info("Custom stock will be added to your selection")
-                additional_stocks = [custom_stock]
-                additional_names = [custom_stock_name]
-            else:
-                additional_stocks = []
-                additional_names = []
-                
             selected_stock_names = st.multiselect("Select Stocks to Compare:", 
                                                sorted(nifty_sensex_stocks.keys()), 
                                                default=[list(nifty_sensex_stocks.keys())[0]])
             
             selected_stocks = [nifty_sensex_stocks[name] for name in selected_stock_names]
-            stock_symbols = [f"{stock}{exchange_suffix}" for stock in selected_stocks + additional_stocks]
-            stock_names = selected_stock_names + additional_names
+            stock_symbols = [f"{stock}{exchange_suffix}" for stock in selected_stocks]
+            stock_names = selected_stock_names
     
     # Main content area
     if not stock_symbols:

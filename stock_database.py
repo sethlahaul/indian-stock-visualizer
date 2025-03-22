@@ -1,125 +1,62 @@
 # Stock Database for Autocomplete Functionality
 import pandas as pd
+import requests
+import io
+
+def get_nse_stocks_list():
+    """
+    Returns a list of dictionaries, each containing stock symbol and company name.
+    
+    Returns:
+        list: List of dictionaries with 'SYMBOL' and 'NAME OF COMPANY' keys
+    """
+    nse_url = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
+    s = requests.Session()
+    s.headers.update(headers)
+    r = s.get(nse_url)
+    s.close()
+    
+    df_nse = pd.read_csv(io.BytesIO(r.content))
+    
+    # Create a list of dictionaries for each stock
+    stock_dict_list = []
+    for index, row in df_nse.iterrows():
+        stock_dict = {
+            row['NAME OF COMPANY'] :row['SYMBOL']            
+        }
+        stock_dict_list.append(stock_dict)
+    
+    return stock_dict_list
 
 def get_stock_database():
     """
     Returns a comprehensive database of Indian stocks with their names and symbols
-    for both NSE and BSE exchanges.
+    from the NSE exchange.
     """
-    # Dictionary of major Indian stocks (Nifty 50 and other popular stocks)
-    nifty_sensex_stocks = {
-        "Reliance Industries": "RELIANCE", 
-        "Tata Consultancy Services": "TCS", 
-        "HDFC Bank": "HDFCBANK",
-        "Infosys": "INFY", 
-        "ICICI Bank": "ICICIBANK", 
-        "Kotak Mahindra Bank": "KOTAKBANK", 
-        "Larsen & Toubro": "LT", 
-        "Axis Bank": "AXISBANK",
-        "Hindustan Unilever": "HINDUNILVR", 
-        "State Bank of India": "SBIN", 
-        "Bajaj Finance": "BAJFINANCE", 
-        "Bharti Airtel": "BHARTIARTL",
-        "Tata Steel": "TATASTEEL", 
-        "ITC": "ITC", 
-        "Maruti Suzuki": "MARUTI", 
-        "Asian Paints": "ASIANPAINT", 
-        "HCL Technologies": "HCLTECH",
-        "Wipro": "WIPRO", 
-        "Tech Mahindra": "TECHM", 
-        "UltraTech Cement": "ULTRACEMCO", 
-        "Sun Pharma": "SUNPHARMA", 
-        "Titan Company": "TITAN",
-        "Bajaj Auto": "BAJAJ-AUTO", 
-        "Power Grid Corp": "POWERGRID", 
-        "NTPC": "NTPC", 
-        "Grasim Industries": "GRASIM", 
-        "IndusInd Bank": "INDUSINDBK",
-        "Tata Motors": "TATAMOTORS", 
-        "Nestle India": "NESTLEIND", 
-        "Mahindra & Mahindra": "M&M", 
-        "Dr. Reddy's Laboratories": "DRREDDY",
-        "JSW Steel": "JSWSTEEL", 
-        "Cipla": "CIPLA", 
-        "Adani Enterprises": "ADANIENT", 
-        "Adani Ports": "ADANIPORTS", 
-        "Eicher Motors": "EICHERMOT",
-        "HDFC Life Insurance": "HDFCLIFE", 
-        "SBI Life Insurance": "SBILIFE", 
-        "Bajaj Finserv": "BAJAJFINSV", 
-        "Britannia Industries": "BRITANNIA",
-        "Hindalco Industries": "HINDALCO", 
-        "Divi's Laboratories": "DIVISLAB", 
-        "Apollo Hospitals": "APOLLOHOSP", 
-        "UPL": "UPL",
-        "Oil & Natural Gas Corp": "ONGC", 
-        "Coal India": "COALINDIA", 
-        "Tata Consumer Products": "TATACONSUM",
-        # Additional popular stocks
-        "Adani Green Energy": "ADANIGREEN",
-        "Adani Power": "ADANIPOWER",
-        "Adani Transmission": "ADANITRANS",
-        "Ambuja Cements": "AMBUJACEM",
-        "Ashok Leyland": "ASHOKLEY",
-        "Aurobindo Pharma": "AUROPHARMA",
-        "Bajaj Holdings": "BAJAJHLDNG",
-        "Bandhan Bank": "BANDHANBNK",
-        "Bank of Baroda": "BANKBARODA",
-        "Berger Paints": "BERGEPAINT",
-        "Bharat Electronics": "BEL",
-        "Bharat Petroleum": "BPCL",
-        "Biocon": "BIOCON",
-        "Bosch": "BOSCHLTD",
-        "Canara Bank": "CANBK",
-        "Cholamandalam Investment": "CHOLAFIN",
-        "Colgate Palmolive": "COLPAL",
-        "Container Corporation": "CONCOR",
-        "Dabur India": "DABUR",
-        "DLF": "DLF",
-        "Federal Bank": "FEDERALBNK",
-        "GAIL India": "GAIL",
-        "Godrej Consumer Products": "GODREJCP",
-        "Havells India": "HAVELLS",
-        "Hero MotoCorp": "HEROMOTOCO",
-        "Hindustan Aeronautics": "HAL",
-        "Hindustan Petroleum": "HINDPETRO",
-        "Hindustan Zinc": "HINDZINC",
-        "IDFC First Bank": "IDFCFIRSTB",
-        "Indian Oil Corporation": "IOC",
-        "Indus Towers": "INDUSTOWER",
-        "Interglobe Aviation": "INDIGO",
-        "Jindal Steel": "JINDALSTEL",
-        "LIC Housing Finance": "LICHSGFIN",
-        "Lupin": "LUPIN",
-        "Marico": "MARICO",
-        "MRF": "MRF",
-        "NMDC": "NMDC",
-        "ONGC": "ONGC",
-        "Page Industries": "PAGEIND",
-        "Petronet LNG": "PETRONET",
-        "Pidilite Industries": "PIDILITIND",
-        "Punjab National Bank": "PNB",
-        "Shree Cement": "SHREECEM",
-        "Siemens": "SIEMENS",
-        "SRF": "SRF",
-        "Tata Chemicals": "TATACHEM",
-        "Tata Power": "TATAPOWER",
-        "Torrent Pharmaceuticals": "TORNTPHARM",
-        "United Breweries": "UBL",
-        "United Spirits": "MCDOWELL-N",
-        "Vedanta": "VEDL",
-        "Voltas": "VOLTAS",
-        "Zee Entertainment": "ZEEL"
-    }
-    
-    # Create a DataFrame for easier searching
+    # Initialize an empty list for stocks
     stocks_list = []
-    for company_name, symbol in nifty_sensex_stocks.items():
-        stocks_list.append({
-            'company_name': company_name,
-            'symbol': symbol,
-            'search_text': f"{company_name} {symbol}".lower()  # For easier searching
-        })
+    
+    # Get the complete NSE stocks list
+    try:
+        nse_stocks = get_nse_stocks_list()
+        
+        # Add NSE stocks to the list
+        for stock_dict in nse_stocks:
+            for company_name, symbol in stock_dict.items():
+                stocks_list.append({
+                    'company_name': company_name,
+                    'symbol': symbol,
+                    'search_text': f"{company_name} {symbol}".lower()  # For easier searching
+                })
+    except Exception as e:
+        print(f"Error fetching NSE stocks: {e}")
+        # Return empty DataFrame if there's an error
+        return pd.DataFrame(columns=['company_name', 'symbol', 'search_text'])
     
     return pd.DataFrame(stocks_list)
 
