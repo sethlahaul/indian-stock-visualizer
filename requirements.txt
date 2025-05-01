@@ -3,3 +3,8 @@ yfinance==0.2.54
 pandas
 plotly
 numpy
+prophet
+statsmodels
+scikit-learn
+tensorflow
+matplotlib
