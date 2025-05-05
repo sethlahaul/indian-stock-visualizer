@@ -8,10 +8,6 @@ import numpy as np
 from stock_database import search_stocks
 from prophet import Prophet
 from prophet.plot import plot_plotly
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Dropout
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -480,11 +476,7 @@ def single_stock_analysis(stock_symbol, stock_name, period, interval):
             st.subheader("Stock Price Forecast")
             
             # Forecasting method selection
-            forecast_method = st.selectbox(
-                "Select Forecasting Method:",
-                ["Prophet", "ARIMA", "LSTM"],
-                index=0
-            )
+            forecast_method = "Prophet"  # Only Prophet is available now
             
             # Forecast period selection
             forecast_days = st.slider(
@@ -497,7 +489,7 @@ def single_stock_analysis(stock_symbol, stock_name, period, interval):
             
             # Forecast button
             if st.button("Generate Forecast"):
-                with st.spinner(f"Generating {forecast_days} days forecast using {forecast_method}..."):
+                with st.spinner(f"Generating {forecast_days} days forecast using Prophet..."):
                     try:
                         # Prepare data for forecasting
                         forecast_data = df[['Close']].reset_index()
@@ -505,199 +497,43 @@ def single_stock_analysis(stock_symbol, stock_name, period, interval):
                         # Remove timezone information from datetime column to avoid Prophet errors
                         forecast_data['ds'] = forecast_data['ds'].dt.tz_localize(None)
                         
-                        if forecast_method == "Prophet":
-                            # Prophet model
-                            m = Prophet(daily_seasonality=True, yearly_seasonality=True, weekly_seasonality=True)
-                            m.fit(forecast_data)
-                            
-                            # Create future dataframe
-                            future = m.make_future_dataframe(periods=forecast_days)
-                            forecast = m.predict(future)
-                            
-                            # Plot forecast
-                            fig = plot_plotly(m, forecast)
-                            fig.update_layout(
-                                title=f"{stock_name} Stock Price Forecast ({forecast_days} days)",
-                                yaxis_title='Stock Price (₹)',
-                                xaxis_title='Date',
-                                template='plotly_white',
-                                height=500
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Show forecast components
-                            st.subheader("Forecast Components")
-                            fig2 = m.plot_components(forecast)
-                            st.pyplot(fig2)
-                            
-                        elif forecast_method == "ARIMA":
-                            # ARIMA model
-                            # Prepare data
-                            train_data = df['Close']
-                            
-                            # Fit ARIMA model (p,d,q) = (5,1,0)
-                            model = ARIMA(train_data, order=(5,1,0))
-                            model_fit = model.fit()
-                            
-                            # Forecast
-                            forecast = model_fit.forecast(steps=forecast_days)
-                            forecast_index = pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=forecast_days)
-                            
-                            # Create forecast dataframe
-                            forecast_df = pd.DataFrame({
-                                'Date': forecast_index,
-                                'Forecast': forecast
-                            })
-                            
-                            # Plot forecast
-                            fig = go.Figure()
-                            
-                            # Add historical data
-                            fig.add_trace(go.Scatter(
-                                x=df.index,
-                                y=df['Close'],
-                                mode='lines',
-                                name='Historical'
-                            ))
-                            
-                            # Add forecast
-                            fig.add_trace(go.Scatter(
-                                x=forecast_df['Date'],
-                                y=forecast_df['Forecast'],
-                                mode='lines',
-                                name='Forecast',
-                                line=dict(dash='dash')
-                            ))
-                            
-                            fig.update_layout(
-                                title=f"{stock_name} ARIMA Forecast ({forecast_days} days)",
-                                yaxis_title='Stock Price (₹)',
-                                xaxis_title='Date',
-                                template='plotly_white',
-                                height=500
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Show forecast summary
-                            st.subheader("ARIMA Model Summary")
-                            st.text(model_fit.summary())
-                            
-                        elif forecast_method == "LSTM":
-                            # LSTM model
-                            # Prepare data
-                            data = df['Close'].values.reshape(-1, 1)
-                            
-                            # Normalize data
-                            scaler = MinMaxScaler(feature_range=(0, 1))
-                            scaled_data = scaler.fit_transform(data)
-                            
-                            # Create training dataset
-                            train_data = scaled_data
-                            x_train, y_train = [], []
-                            
-                            # Create sequences for LSTM (using 60 days of data to predict next day)
-                            for i in range(60, len(train_data)):
-                                x_train.append(train_data[i-60:i, 0])
-                                y_train.append(train_data[i, 0])
-                                
-                            x_train, y_train = np.array(x_train), np.array(y_train)
-                            x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-                            
-                            # Build LSTM model
-                            model = Sequential()
-                            model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
-                            model.add(Dropout(0.2))
-                            model.add(LSTM(units=50, return_sequences=False))
-                            model.add(Dropout(0.2))
-                            model.add(Dense(units=1))
-                            
-                            # Compile and fit model
-                            model.compile(optimizer='adam', loss='mean_squared_error')
-                            model.fit(x_train, y_train, epochs=20, batch_size=32, verbose=0)
-                            
-                            # Generate predictions for future days
-                            # First, get the last 60 days of data
-                            inputs = data[-60:]
-                            inputs = scaler.transform(inputs)
-                            
-                            # Initialize list for predictions
-                            lstm_predictions = []
-                            current_batch = inputs.reshape((1, 60, 1))
-                            
-                            # Predict next 'forecast_days' days
-                            for i in range(forecast_days):
-                                current_pred = model.predict(current_batch)[0]
-                                lstm_predictions.append(current_pred[0])
-                                
-                                # Update batch for next prediction
-                                new_input = np.append(current_batch[:, 1:, :], [[current_pred]], axis=1)
-                                current_batch = new_input
-                            
-                            # Inverse transform predictions
-                            lstm_predictions = np.array(lstm_predictions).reshape(-1, 1)
-                            lstm_predictions = scaler.inverse_transform(lstm_predictions)
-                            
-                            # Create forecast dataframe
-                            forecast_index = pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=forecast_days)
-                            forecast_df = pd.DataFrame({
-                                'Date': forecast_index,
-                                'Forecast': lstm_predictions.flatten()
-                            })
-                            
-                            # Plot forecast
-                            fig = go.Figure()
-                            
-                            # Add historical data
-                            fig.add_trace(go.Scatter(
-                                x=df.index,
-                                y=df['Close'],
-                                mode='lines',
-                                name='Historical'
-                            ))
-                            
-                            # Add forecast
-                            fig.add_trace(go.Scatter(
-                                x=forecast_df['Date'],
-                                y=forecast_df['Forecast'],
-                                mode='lines',
-                                name='Forecast',
-                                line=dict(dash='dash')
-                            ))
-                            
-                            fig.update_layout(
-                                title=f"{stock_name} LSTM Forecast ({forecast_days} days)",
-                                yaxis_title='Stock Price (₹)',
-                                xaxis_title='Date',
-                                template='plotly_white',
-                                height=500
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Show forecast data
-                            st.subheader("LSTM Forecast Data")
-                            st.dataframe(forecast_df)
+                        # Prophet model
+                        m = Prophet(daily_seasonality=True, yearly_seasonality=True, weekly_seasonality=True)
+                        m.fit(forecast_data)
+                        
+                        # Create future dataframe
+                        future = m.make_future_dataframe(periods=forecast_days)
+                        forecast = m.predict(future)
+                        
+                        # Plot forecast
+                        fig = plot_plotly(m, forecast)
+                        fig.update_layout(
+                            title=f"{stock_name} Stock Price Forecast ({forecast_days} days)",
+                            yaxis_title='Stock Price (₹)',
+                            xaxis_title='Date',
+                            template='plotly_white',
+                            height=500
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Show forecast components
+                        st.subheader("Forecast Components")
+                        fig2 = m.plot_components(forecast)
+                        st.pyplot(fig2)
                     
                     except Exception as e:
                         st.error(f"Error generating forecast: {str(e)}")
-                        st.info("Try a different forecasting method or adjust the forecast period.")
+                        st.info("Try adjusting the forecast period.")
             
-            # Explanation of forecasting methods
-            with st.expander("About Forecasting Methods"):
+            # Explanation of forecasting method
+            with st.expander("About Prophet Forecasting"):
                 st.markdown("""
                 ### Prophet
                 - Developed by Facebook
                 - Handles seasonality and holiday effects
                 - Good for time series with strong seasonal patterns
-                
-                ### ARIMA (AutoRegressive Integrated Moving Average)
-                - Traditional statistical method
-                - Works well for stationary time series
-                - Captures temporal dependencies
-                
-                ### LSTM (Long Short-Term Memory)
-                - Deep learning approach
-                - Captures complex patterns and long-term dependencies
-                - Requires more data for accurate predictions
+                - Automatically detects changepoints in the time series
+                - Robust to missing data and outliers
                 
                 **Note:** All forecasting methods have limitations and should be used as one of many tools for investment decisions. Past performance is not indicative of future results.
                 """)
