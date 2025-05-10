@@ -243,8 +243,26 @@ def main():
         
         # Create a dictionary of company names to symbols
         nifty_sensex_stocks = {}
-        for _, row in stocks_df.iterrows():
-            nifty_sensex_stocks[row['company_name']] = row['symbol']
+        
+        # Check if we got any stocks from the database
+        if not stocks_df.empty:
+            for _, row in stocks_df.iterrows():
+                nifty_sensex_stocks[row['company_name']] = row['symbol']
+        else:
+            # Fallback to a basic list of major Indian stocks if database fetch fails
+            st.warning("Could not fetch complete stock list. Using a limited list of major stocks.")
+            nifty_sensex_stocks = {
+                "Reliance Industries": "RELIANCE",
+                "Tata Consultancy Services": "TCS",
+                "HDFC Bank": "HDFCBANK",
+                "Infosys": "INFY",
+                "ICICI Bank": "ICICIBANK",
+                "Kotak Mahindra Bank": "KOTAKBANK",
+                "Larsen & Toubro": "LT",
+                "Axis Bank": "AXISBANK",
+                "Hindustan Unilever": "HINDUNILVR",
+                "State Bank of India": "SBIN"
+            }
         
         # Stock selection is now done exclusively from the database
         # Custom stock input has been removed as we now have all listed stocks
