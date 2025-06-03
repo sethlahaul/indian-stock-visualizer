@@ -6,31 +6,36 @@ import io
 def get_nse_stocks_list():
     """
     Returns a list of dictionaries, each containing stock symbol and company name.
-    
+    Tries to fetch from NSE API, falls back to local CSV if API fails.
     Returns:
         list: List of dictionaries with 'SYMBOL' and 'NAME OF COMPANY' keys
     """
     nse_url = "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
-    
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    
-    s = requests.Session()
-    s.headers.update(headers)
-    r = s.get(nse_url)
-    s.close()
-    
-    df_nse = pd.read_csv(io.BytesIO(r.content))
-    
+    try:
+        s = requests.Session()
+        s.headers.update(headers)
+        r = s.get(nse_url, timeout=10)
+        s.close()
+        r.raise_for_status()
+        df_nse = pd.read_csv(io.BytesIO(r.content))
+    except Exception as e:
+        print(f"Error fetching NSE stocks from API: {e}. Falling back to local CSV.")
+        # Fallback to local CSV file
+        try:
+            df_nse = pd.read_csv("equityList/EQUITY_L.csv")
+        except Exception as e2:
+            print(f"Error reading local CSV: {e2}")
+            return []
     # Create a list of dictionaries for each stock
     stock_dict_list = []
     for index, row in df_nse.iterrows():
         stock_dict = {
-            row['NAME OF COMPANY'] :row['SYMBOL']            
+            row['NAME OF COMPANY']: row['SYMBOL']
         }
         stock_dict_list.append(stock_dict)
-    
     return stock_dict_list
 
 def get_stock_database():
