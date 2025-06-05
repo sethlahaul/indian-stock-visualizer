@@ -301,7 +301,7 @@ def main():
     """
     **Want to analyze mutual funds?**
 
-    🔗 [Indian Mutual Fund Monitor](https://indian-mf-monitor.streamlit.app)
+    🔗 [Indian Mutual Fund Anazlyzer](https://indian-mutual-fund-analyzer.streamlit.app)
 
     Analyze mutual funds with technical indicators, and fund data.
     """,
