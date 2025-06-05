@@ -308,6 +308,7 @@ def main():
     unsafe_allow_html=True
     )
     st.sidebar.markdown("---")
+    st.markdown("⚠️ **Disclaimer:** This is for informational purposes only and should not be considered as investment advice.")
 
 def single_stock_analysis(stock_symbol, stock_name, period, interval):
     """Detailed analysis for a single stock"""
