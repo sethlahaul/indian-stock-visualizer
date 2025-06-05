@@ -293,6 +293,21 @@ def main():
         single_stock_analysis(stock_symbols[0], stock_names[0], period, interval)
     else:
         multi_stock_comparison(stock_symbols, stock_names, period, interval)
+    
+    # Add stock analyzer link in sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Related Tools")
+    st.sidebar.markdown(
+    """
+    **Want to analyze mutual funds?**
+
+    🔗 [Indian Mutual Fund Monitor](https://indian-mf-monitor.streamlit.app)
+
+    Analyze mutual funds with technical indicators, and fund data.
+    """,
+    unsafe_allow_html=True
+    )
+    st.sidebar.markdown("---")
 
 def single_stock_analysis(stock_symbol, stock_name, period, interval):
     """Detailed analysis for a single stock"""
